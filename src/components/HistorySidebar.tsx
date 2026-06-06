@@ -1,6 +1,6 @@
 import React from "react";
 import { History, Trash2, GitPullRequest, Star, Calendar } from "lucide-react";
-import { SavedAnalysis } from "../types";
+import { SavedAnalysis } from "@/types";
 
 interface HistorySidebarProps {
   historyList: SavedAnalysis[];

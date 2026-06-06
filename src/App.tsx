@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import Dashboard from "./components/Dashboard";
 import ReportViewer from "./components/ReportViewer";
 import HistorySidebar from "./components/HistorySidebar";
-import { GitHubMetadata, AnalysisResult, SavedAnalysis } from "./types";
+import { GitHubMetadata, AnalysisResult, SavedAnalysis } from "@/types";
 import { Github, Sparkles, HelpCircle, AlertCircle, BookOpen, Clock, Activity } from "lucide-react";
 
 export default function App() {

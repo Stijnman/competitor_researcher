@@ -1,0 +1,41 @@
+{
+  "repoUrl": "https://github.com/facebook/react",
+  "analyzedAt": "2026-06-06T12:00:00.000Z",
+  "githubMetadata": {
+    "owner": "facebook",
+    "repo": "react",
+    "description": "The library for web and native user interfaces.",
+    "stars": 225000,
+    "forks": 46000,
+    "openIssues": 1200,
+    "language": "JavaScript",
+    "readme": "React is a JavaScript library for building user interfaces."
+  },
+  "isFallback": true,
+  "fallbackReason": "Demo fixture loaded.",
+  "executiveSummary": "React dominates the UI library space but faces competition from frameworks with better SSR defaults.",
+  "projectOverview": {
+    "purpose": "UI library for web and native",
+    "targetUsers": "Frontend developers",
+    "techStack": ["JavaScript", "TypeScript", "React"],
+    "strengths": ["Ecosystem", "Performance"]
+  },
+  "competitors": [],
+  "featureMatrix": [],
+  "gapAnalysis": {
+    "criticalGaps": ["Server components complexity"],
+    "quickWins": ["Better docs"],
+    "highValueStrategic": ["AI integration"],
+    "existingStrengths": ["Community"]
+  },
+  "roadmap": [],
+  "detailedSuggestions": [],
+  "risksAndEthics": {
+    "technicalRisks": "None",
+    "dependencyConsiderations": "None",
+    "githubHygiene": "Good",
+    "nextSteps": ["Adopt new features"]
+  },
+  "agentPrompt": "## Demo prompt for React",
+  "fullMarkdownReport": "# Demo Report for React\n\nExecutive summary here."
+}
