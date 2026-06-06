@@ -220,6 +220,31 @@ export default function ReportViewer({ analysis, onReset }: ReportViewerProps) {
     setTimeout(() => setCopiedReport(false), 2000);
   };
 
+  // Enhanced exports (item 41)
+  const downloadMarkdown = () => {
+    const blob = new Blob([analysis.fullMarkdownReport], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `competitive-analysis-${analysis.githubMetadata.owner}-${analysis.githubMetadata.repo}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadJSON = () => {
+    const blob = new Blob([JSON.stringify(analysis, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `competitive-analysis-${analysis.githubMetadata.owner}-${analysis.githubMetadata.repo}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // Get color badges for priorities optimized for Elegant Dark
   const getPriorityBadge = (prio: string) => {
     const p = prio.toUpperCase();
@@ -933,24 +958,43 @@ export default function ReportViewer({ analysis, onReset }: ReportViewerProps) {
               <h3 className="font-display font-bold text-white text-base">Ecosystem Competitive Analysis</h3>
               <p className="text-xs text-[#8b949e] font-sans">Full raw 8-section technical markdown report format</p>
             </div>
-            <button
-              id="copy-doc-btn"
-              type="button"
-              onClick={copyReport}
-              className="px-4 py-2 bg-[#21262d] border border-[#30363d] hover:bg-[#30363d] text-[#c9d1d9] text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 transition-all focus:outline-none cursor-pointer"
-            >
-              {copiedReport ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-[#58a6ff]" />
-                  Copied Report!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  Copy Report (MD)
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                id="copy-doc-btn"
+                type="button"
+                onClick={copyReport}
+                className="px-4 py-2 bg-[#21262d] border border-[#30363d] hover:bg-[#30363d] text-[#c9d1d9] text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 transition-all focus:outline-none cursor-pointer"
+              >
+                {copiedReport ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-[#58a6ff]" />
+                    Copied Report!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    Copy Report (MD)
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={downloadMarkdown}
+                className="px-3 py-2 bg-[#21262d] border border-[#30363d] hover:bg-[#30363d] text-[#c9d1d9] text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 transition-all focus:outline-none cursor-pointer"
+                title="Download as .md file"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                .md
+              </button>
+              <button
+                type="button"
+                onClick={downloadJSON}
+                className="px-3 py-2 bg-[#21262d] border border-[#30363d] hover:bg-[#30363d] text-[#c9d1d9] text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 transition-all focus:outline-none cursor-pointer"
+                title="Download full result as JSON"
+              >
+                JSON
+              </button>
+            </div>
           </div>
           <div className="p-6 md:p-10 border-t border-[#30363d]">
             <div className="markdown-body font-sans text-[#c9d1d9] leading-relaxed overflow-x-auto whitespace-pre-wrap max-w-full">
