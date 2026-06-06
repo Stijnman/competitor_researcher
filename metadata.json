@@ -1,0 +1,6 @@
+{
+  "name": "Competitive GitHub Master",
+  "description": "A competitive intelligence tool for GitHub repositories that analyzes competitors and generates actionable roadmaps and agent instructions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
