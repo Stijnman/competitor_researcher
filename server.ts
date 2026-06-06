@@ -10,8 +10,11 @@ import { z } from "zod";
 
 import { generateFallbackReport } from "./fallbackGenerator";
 import { parseGitHubUrl, type ParsedGitHubRepo } from "./utils/parseGitHubUrl";
+import { logger } from "./server/logger";
 
 dotenv.config();
+
+const log = logger;
 
 async function startServer() {
   const app = express();
@@ -366,7 +369,7 @@ Execute this with peak precision! Make sure the tone is mature, technical, objec
       let fallbackReason = "";
 
       if (isMockMode) {
-        console.warn("MOCK_ANALYSIS enabled or no GEMINI_API_KEY — using high-fidelity local generator.");
+        log.warn({ mockMode: true }, "MOCK_ANALYSIS enabled or no GEMINI_API_KEY — using high-fidelity local generator.");
         isFallback = true;
         fallbackReason = isMockMode && !process.env.GEMINI_API_KEY 
           ? "Running in mock mode (no API key). Using built-in strategic simulator."
@@ -374,7 +377,7 @@ Execute this with peak precision! Make sure the tone is mature, technical, objec
         result = generateFallbackReport(parsed.owner, parsed.repo, githubMetadata);
       } else {
         try {
-          console.log(`Executing Attempt 1 for: ${parsed.owner}/${parsed.repo} with Google Search grounding...`);
+          log.info({ owner: parsed.owner, repo: parsed.repo }, 'Executing Attempt 1 with Google Search grounding');
           // Attempt 1: Call Gemini with search grounding enabled
           const response = await ai.models.generateContent({
             model: "gemini-3.5-flash",
@@ -393,12 +396,12 @@ Execute this with peak precision! Make sure the tone is mature, technical, objec
           }
           result = JSON.parse(text.trim());
         } catch (firstErr: any) {
-          console.error("First Gemini API attempt with googleSearch failed:", firstErr);
+          log.error({ err: firstErr }, 'First Gemini API attempt with googleSearch failed');
           const errMsg = String(firstErr.message || firstErr.status || firstErr.code || "").toLowerCase();
           const isQuota = errMsg.includes("quota") || errMsg.includes("exhausted") || errMsg.includes("429") || errMsg.includes("resource_exhausted");
 
           if (isQuota) {
-            console.warn("Google search-grounding quota limits hit. Retrying compilation WITHOUT search grounding tool...");
+            log.warn('Google search-grounding quota limits hit. Retrying WITHOUT search grounding tool');
             try {
               // Attempt 2: Call Gemini WITHOUT search grounding (vastly less likely to hit 429)
               const response2 = await ai.models.generateContent({

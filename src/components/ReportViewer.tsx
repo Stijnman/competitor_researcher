@@ -245,6 +245,39 @@ export default function ReportViewer({ analysis, onReset }: ReportViewerProps) {
     URL.revokeObjectURL(url);
   };
 
+  // Client-side PDF export using jsPDF + html2canvas (item from best features)
+  const downloadPDF = async () => {
+    const { jsPDF } = await import('jspdf');
+    const html2canvas = (await import('html2canvas')).default;
+
+    const reportElement = document.getElementById('report-viewer-root');
+    if (!reportElement) return;
+
+    const canvas = await html2canvas(reportElement, { scale: 2 });
+    const imgData = canvas.toDataURL('image/png');
+
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pdfWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pdfHeight;
+
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+    }
+
+    pdf.save(`competitive-analysis-${analysis.githubMetadata.owner}-${analysis.githubMetadata.repo}.pdf`);
+  };
+
   // Get color badges for priorities optimized for Elegant Dark
   const getPriorityBadge = (prio: string) => {
     const p = prio.toUpperCase();
@@ -993,6 +1026,14 @@ export default function ReportViewer({ analysis, onReset }: ReportViewerProps) {
                 title="Download full result as JSON"
               >
                 JSON
+              </button>
+              <button
+                type="button"
+                onClick={downloadPDF}
+                className="px-3 py-2 bg-[#238636] hover:bg-[#2ea043] text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 transition-all focus:outline-none cursor-pointer"
+                title="Download professional PDF report"
+              >
+                PDF
               </button>
             </div>
           </div>

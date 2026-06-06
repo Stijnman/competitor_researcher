@@ -225,13 +225,14 @@ export default function Dashboard({ onStartAnalysis, isLoading, loadingStep }: D
           <div className="pt-4 border-t border-[#30363d] flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2.5 text-xs text-[#8b949e] font-sans">
               <Sparkles className="w-4 h-4 text-[#58a6ff] flex-shrink-0" />
-              <span>Real-time Google search-grounding enabled by Gemini 3.5.</span>
+              <span>Real-time Google search-grounding (falls back to high-fidelity local generator with no API key needed).</span>
             </div>
             <button
               id="start-scanning-btn"
               type="button"
               onClick={executeAnalysis}
               disabled={isLoading || !url.trim()}
+              aria-label="Start competitive analysis of the entered GitHub repository"
               className="w-full sm:w-auto px-8 py-3.5 bg-[#238636] hover:bg-[#2ea043] text-white font-semibold text-sm rounded-xl inline-flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-[#2ea043] focus:ring-offset-2 font-sans cursor-pointer"
             >
               {isLoading ? (

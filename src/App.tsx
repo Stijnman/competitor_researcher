@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import Dashboard from "./components/Dashboard";
-import ReportViewer from "./components/ReportViewer";
 import HistorySidebar from "./components/HistorySidebar";
 import { GitHubMetadata, AnalysisResult, SavedAnalysis } from "./types";
-import { Github, Sparkles, HelpCircle, AlertCircle, BookOpen, Clock, Activity } from "lucide-react";
+import { Github, Sparkles, HelpCircle, AlertCircle, BookOpen, Clock, Activity, Loader2 } from "lucide-react";
+
+// Code splitting for heavy components (item 40)
+const ReportViewer = lazy(() => import("./components/ReportViewer"));
 
 export default function App() {
   const [activeAnalysis, setActiveAnalysis] = useState<AnalysisResult | null>(null);
@@ -204,7 +206,14 @@ export default function App() {
 
             {/* Switch view logic: Dashboard or Strategy Report */}
             {activeAnalysis ? (
-              <ReportViewer analysis={activeAnalysis} onReset={handleReset} />
+              <Suspense fallback={
+                <div className="flex items-center justify-center p-12 text-[#8b949e]">
+                  <Loader2 className="w-6 h-6 animate-spin mr-3" />
+                  Loading report...
+                </div>
+              }>
+                <ReportViewer analysis={activeAnalysis} onReset={handleReset} />
+              </Suspense>
             ) : (
               <Dashboard 
                 onStartAnalysis={handleStartAnalysis} 
