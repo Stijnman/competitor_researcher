@@ -92,11 +92,11 @@ export default function App() {
         stars: result.githubMetadata.stars || 0
       };
 
-      // Set state and storage bounds
+      // Set state and storage bounds (limit history to last 25 entries - item 25)
       setActiveAnalysis(result);
       localStorage.setItem(`cgm_analysis_body_${indexId}`, JSON.stringify(result));
 
-      const updatedHistory = [newSavedIndex, ...historyList.filter(item => item.repoUrl !== repoUrl)];
+      const updatedHistory = [newSavedIndex, ...historyList.filter(item => item.repoUrl !== repoUrl)].slice(0, 25);
       setHistoryList(updatedHistory);
       localStorage.setItem("cgm_history_indices", JSON.stringify(updatedHistory));
 
