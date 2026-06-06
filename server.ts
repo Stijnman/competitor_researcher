@@ -3,15 +3,53 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import { z } from "zod";
+
 import { generateFallbackReport } from "./fallbackGenerator";
+import { parseGitHubUrl, type ParsedGitHubRepo } from "./utils/parseGitHubUrl";
+import { logger } from "./server/logger";
 
 dotenv.config();
 
+const log = logger;
+
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
-  app.use(express.json());
+  // Security & CORS (items 20, 46)
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // Vite dev needs it
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      }
+    }
+  }));
+  app.use(cors({
+    origin: process.env.CORS_ORIGIN || '*',
+    credentials: true
+  }));
+  app.use(express.json({ limit: '1mb' }));
+
+  // Basic rate limiting (item 16) - stricter on analyze
+  const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: { error: "Too many requests, please try again later." }
+  });
+  const analyzeLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    max: 20,
+    message: { error: "Analysis rate limit reached. Please wait before requesting another report." }
+  });
+
+  app.use(generalLimiter);
 
   // Initialize Gemini Client
   const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -24,37 +62,46 @@ async function startServer() {
     }
   });
 
-  // Extract owner and repo names from various GitHub URL formats
-  function parseGitHubUrl(url: string) {
-    const trimmed = url.trim();
-    // Match github.com/owner/repo
-    const githubRegex = /github\.com\/([^/]+)\/([^/&#?]+)/i;
-    const match = trimmed.match(githubRegex);
-    if (match) {
-      return { owner: match[1], repo: match[2].replace(/\.git$/i, "") };
-    }
+  // Simple in-memory cache for repo metadata (item 23)
+  const repoInfoCache = new Map<string, { data: any; expires: number }>();
+  const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-    // Match short format: owner/repo
-    const shortRegex = /^([^/]+)\/([^/]+)$/;
-    const shortMatch = trimmed.match(shortRegex);
-    if (shortMatch) {
-      return { owner: shortMatch[1], repo: shortMatch[2] };
-    }
+  // Zod validation schemas (item 12)
+  const repoInfoQuerySchema = z.object({
+    url: z.string().min(3)
+  });
 
-    return null;
-  }
+  const analyzeBodySchema = z.object({
+    repoUrl: z.string().min(3),
+    customInstructions: z.string().optional(),
+    githubMetadata: z.any().optional()
+  });
 
-  // API endpoint for GitHub Repository Metadata
-  app.get("/api/repo-info", async (req, res) => {
+  // API endpoint for GitHub Repository Metadata (with cache + validation)
+  app.get("/api/repo-info", generalLimiter, async (req, res) => {
     try {
-      const { url } = req.query;
-      if (!url || typeof url !== "string") {
-        return res.status(400).json({ error: "Missing 'url' parameter" });
+      const parseResult = repoInfoQuerySchema.safeParse(req.query);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid request", 
+          code: "INVALID_INPUT",
+          details: parseResult.error.flatten() 
+        });
+      }
+      const { url } = parseResult.data;
+
+      const cacheKey = url.toLowerCase();
+      const cached = repoInfoCache.get(cacheKey);
+      if (cached && cached.expires > Date.now()) {
+        return res.json(cached.data);
       }
 
       const parsed = parseGitHubUrl(url);
       if (!parsed) {
-        return res.status(400).json({ error: "Invalid GitHub Repository URL or format. Use 'owner/repo' or full github.com link." });
+        return res.status(400).json({ 
+          error: "Invalid GitHub Repository URL or format. Use 'owner/repo' or full github.com link.", 
+          code: "INVALID_GITHUB_URL" 
+        });
       }
 
       const headers: HeadersInit = {
@@ -69,6 +116,7 @@ async function startServer() {
       if (!repoRes.ok) {
         return res.status(404).json({
           error: `Could not find GitHub repository: ${parsed.owner}/${parsed.repo}. Please check correctness.`,
+          code: "REPO_NOT_FOUND",
           fallbackParsed: parsed
         });
       }
@@ -90,7 +138,7 @@ async function startServer() {
         console.error("Failed to fetch README:", readmeErr);
       }
 
-      res.json({
+      const result = {
         owner: parsed.owner,
         repo: parsed.repo,
         description: data.description || "No description provided.",
@@ -99,21 +147,35 @@ async function startServer() {
         openIssues: data.open_issues_count,
         language: data.language || "Unknown",
         readme: readme || "No README content found."
-      });
+      };
+
+      // Cache it
+      repoInfoCache.set(cacheKey, { data: result, expires: Date.now() + CACHE_TTL_MS });
+
+      res.json(result);
     } catch (err: any) {
       console.error("Error in repo-info endpoint:", err);
-      res.status(500).json({ error: err.message || "Internal server error" });
+      res.status(500).json({ error: err.message || "Internal server error", code: "INTERNAL_ERROR" });
     }
   });
 
+  // Lightweight mock mode for local dev without keys (item 38)
+  const isMockMode = process.env.MOCK_ANALYSIS === 'true' || !process.env.GEMINI_API_KEY;
+
   // API endpoint for executing Competitive Market Intelligence using Gemini
-  app.post("/api/analyze", async (req, res) => {
-    const { repoUrl, customInstructions, githubMetadata } = req.body;
-    if (!repoUrl) {
-      return res.status(400).json({ error: "Missing 'repoUrl' parameter" });
+  app.post("/api/analyze", analyzeLimiter, async (req, res) => {
+    const parseResult = analyzeBodySchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ 
+        error: "Invalid request payload", 
+        code: "INVALID_INPUT",
+        details: parseResult.error.flatten() 
+      });
     }
 
-    const parsed = parseGitHubUrl(repoUrl) || { owner: "Unknown", repo: "TargetRepository" };
+    const { repoUrl, customInstructions, githubMetadata } = parseResult.data;
+
+    const parsed: ParsedGitHubRepo = parseGitHubUrl(repoUrl) || { owner: "Unknown", repo: "TargetRepository" };
 
     try {
       // Base user message constructing all available facts
@@ -306,14 +368,16 @@ Execute this with peak precision! Make sure the tone is mature, technical, objec
       let isFallback = false;
       let fallbackReason = "";
 
-      if (!geminiApiKey) {
-        console.warn("No active GEMINI_API_KEY detected. Moving straight to dynamic sandbox simulator...");
+      if (isMockMode) {
+        log.warn({ mockMode: true }, "MOCK_ANALYSIS enabled or no GEMINI_API_KEY — using high-fidelity local generator.");
         isFallback = true;
-        fallbackReason = "No Gemini API access token is registered in the cloud environment. Active local strategic analyzer was automatically initialized to generate results.";
+        fallbackReason = isMockMode && !process.env.GEMINI_API_KEY 
+          ? "Running in mock mode (no API key). Using built-in strategic simulator."
+          : "No Gemini API access token. Active local strategic analyzer was automatically initialized.";
         result = generateFallbackReport(parsed.owner, parsed.repo, githubMetadata);
       } else {
         try {
-          console.log(`Executing Attempt 1 for: ${parsed.owner}/${parsed.repo} with Google Search grounding...`);
+          log.info({ owner: parsed.owner, repo: parsed.repo }, 'Executing Attempt 1 with Google Search grounding');
           // Attempt 1: Call Gemini with search grounding enabled
           const response = await ai.models.generateContent({
             model: "gemini-3.5-flash",
@@ -332,12 +396,12 @@ Execute this with peak precision! Make sure the tone is mature, technical, objec
           }
           result = JSON.parse(text.trim());
         } catch (firstErr: any) {
-          console.error("First Gemini API attempt with googleSearch failed:", firstErr);
+          log.error({ err: firstErr }, 'First Gemini API attempt with googleSearch failed');
           const errMsg = String(firstErr.message || firstErr.status || firstErr.code || "").toLowerCase();
           const isQuota = errMsg.includes("quota") || errMsg.includes("exhausted") || errMsg.includes("429") || errMsg.includes("resource_exhausted");
 
           if (isQuota) {
-            console.warn("Google search-grounding quota limits hit. Retrying compilation WITHOUT search grounding tool...");
+            log.warn('Google search-grounding quota limits hit. Retrying WITHOUT search grounding tool');
             try {
               // Attempt 2: Call Gemini WITHOUT search grounding (vastly less likely to hit 429)
               const response2 = await ai.models.generateContent({
@@ -398,6 +462,26 @@ Execute this with peak precision! Make sure the tone is mature, technical, objec
     }
   });
 
+  // Health & readiness endpoints (item 18)
+  app.get("/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      version: "0.1.0",
+      mockMode: isMockMode 
+    });
+  });
+
+  app.get("/ready", (req, res) => {
+    const ready = !!geminiApiKey || isMockMode;
+    res.status(ready ? 200 : 503).json({
+      status: ready ? "ready" : "degraded",
+      geminiConfigured: !!geminiApiKey,
+      mockMode: isMockMode,
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Serve static assets or mount Vite middleware
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -413,9 +497,26 @@ Execute this with peak precision! Make sure the tone is mature, technical, objec
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`CompetitiveGitHubMaster backend running on http://0.0.0.0:${PORT}`);
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`CompetitiveGitHubMaster backend running on http://0.0.0.0:${PORT} (mockMode=${isMockMode})`);
   });
+
+  // Graceful shutdown (item 19)
+  const shutdown = (signal: string) => {
+    console.log(`\n${signal} received. Shutting down gracefully...`);
+    server.close(() => {
+      console.log("HTTP server closed.");
+      process.exit(0);
+    });
+    // Force close after 10s
+    setTimeout(() => {
+      console.error("Forcing shutdown after timeout");
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 startServer();
