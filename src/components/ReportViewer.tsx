@@ -4,7 +4,7 @@ import {
   FileText, Shield, Sparkles, Star, Target, TrendingUp, 
   GitBranch, Code, AlertTriangle, Play, HelpCircle, ArrowRight, CornerDownRight
 } from "lucide-react";
-import { AnalysisResult } from "../types";
+import { AnalysisResult } from "@/types";
 
 interface ReportViewerProps {
   analysis: AnalysisResult;

@@ -1,4 +1,4 @@
-import { AnalysisResult } from "./src/types";
+import { AnalysisResult } from "@/types";
 
 // Generates highly detailed fallback/demo reports for popular test-drives,
 // plus a dynamic fallback report for any arbitrary repo URL.

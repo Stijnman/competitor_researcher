@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Search, Github, Sparkles, Loader2, HelpCircle, AlertCircle, RefreshCw, Send, Settings, BookOpen } from "lucide-react";
-import { GitHubMetadata } from "../types";
+import { GitHubMetadata } from "@/types";
 
 interface DashboardProps {
   onStartAnalysis: (repoUrl: string, customInstructions: string, metadata: GitHubMetadata | null) => Promise<void>;
@@ -271,7 +271,7 @@ export default function Dashboard({ onStartAnalysis, isLoading, loadingStep }: D
         </div>
       )}
 
-      {/* Predefined Repositories Examples Grid */}
+      {/* Predefined Repositories Examples Grid + Demo (Batch 2 sample data) */}
       <div className="space-y-4">
         <h3 className="font-display font-semibold text-lg text-white flex items-center gap-2">
           <BookOpen className="w-4 h-4 text-[#58a6ff]" />
