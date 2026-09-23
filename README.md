@@ -60,3 +60,7 @@ fallbackGenerator.ts
 ## License
 
 MIT © 2026 Stijnman
+
+## Flagship integration
+
+This project remains independently usable and is not deprecated. Its capabilities are also consumed by [CommerceForge](https://github.com/Stijnman/CommerceForge), where they are integrated with complementary repositories behind shared platform contracts. This repository remains the source of truth for its component-specific implementation.
